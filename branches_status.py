@@ -48,7 +48,7 @@ table tr th, table tr td {
   background: #554444;
   color: #FFF;
   border-radius: 8px;
-  padding: 8px 2px;
+  padding: 8px 4px;
   font-family: "Arial", Arial, sans-serif;
   text-align: center;
 }
@@ -59,7 +59,7 @@ table tr th {
 
 table tr td {
   background: #444444;
-  font-size: 1.4em;
+  font-size: 2em;
 }
 
 table .branch {
@@ -72,40 +72,47 @@ table .pipeline {
   text-align: center;
 }
 
+table .null { 
+  background: #000000;
+}
+
 table .pending { 
   background: #000000;
   text-align: center;
-  padding: 4px 4px;
+  padding: 6px 14px;
   border-radius: 6px;
 }
 
 table .created { 
   background: #000000;
   text-align: center;
-  padding: 4px 4px;
+  padding: 6px 14px;
   border-radius: 6px;
 }
 
 table .running { 
   background: #444444;
   text-align: center;
-  padding: 4px 4px;
+  padding: 6px 14px;
   border-radius: 6px;
 }
 
 table .success { 
   background: #00BB00;
   text-align: center;
+  padding: 6px 14px;
 }
 
 table .OK { 
   background: #00BB00;
   text-align: center;
+  padding: 6px 14px;
 }
 
 table .failed {
   background: #DD0000;
   text-align: center;
+  padding: 6px 14px;
 }
 
 a {
@@ -303,53 +310,65 @@ console.log(self.id)
 </script>
 '''
 
-# Iterate through branch list to extract the list of variants
-variant_list = []
+# Iterate through branch list to extract the list of variants, and split job names in two parts
+variant_list = [] # all job names, then splited in two parts : "quick:linux" => [quick, linux]
+stage_list   = [] # stages (build/test/deploy) from first part of the job name
+os_list      = [] # OSs (linux/windows) from second part of the job name
 for branch_name, branch_status in branch_list.iteritems():
 	for variant_name, variants in branch_status.variants.iteritems():
-		if variant_name not in variant_list :
+		if variant_name not in variant_list:
 			variant_list.append(variant_name)
+			variant_title = variant_name.split(":", 1)
+			stage = variant_title[0]
+			if stage not in stage_list:
+				stage_list.append(stage)
+			os = variant_title[1]
+			if os not in os_list:
+				os_list.append(os)
+os_list.sort()
 
 # Header of the table
 print '''<div id="titre">Branch Status</div>'''
 print '''<table>'''
-print '''<tr><th/>'''
-for variant in variant_list:
-	variant_title = variant.split(":", 1)
-	print '''<th class="titre">''' + variant_title[0] + "<br/>" + variant_title[-1] + '''</td>''' # extract "quick" and "linux" from "quick:linux"
+print '''<tr>'''
+print '''  <th/>'''
+for os in os_list:
+	print '''  <th colspan="'''+str(len(stage_list))+'''" class="titre">''' + os.capitalize() + '''</td>''' # extract "quick" and "linux" from "quick:linux"
 print '''</tr>'''
 
 # Iterate through branches sorted by date of the last update
 cpt = 0
 for (branch_name, branch_status) in sorted(branch_list.items(), key=lambda(k,v): v.date_maj, reverse=True):
-	if branch_status.url:
-		print '''<tr><td class="branch"><a class="pipeline" href="'''+branch_status.url+'''">''' + branch_name + '''</a></td>'''
-	else:
-		print '''<tr><td class="branch">''' + branch_name + '''</a></td>'''
+#	if branch_status.url:
+#		print '''<tr>\n  <td rawspan="'''+str(len(os_list))+'''" class="branch"><a class="pipeline" href="'''+branch_status.url+'''">''' + branch_name + '''</a></td>'''
+#	else:
+	print '''<tr>\n  <td class="branch">''' + branch_name + '''</a></td>'''
 
-	# Add a column for each variant
-	for variant in variant_list:
-		try:
-			status   = branch_status.variants[variant].status
-			previous = branch_status.variants[variant].previous
-			if not previous:
-				previous = status
-			url      = branch_status.variants[variant].url
-			if url:
-				href = ''' href="''' + url + '''"'''
-			else:
-				href = ""
-			print '''<td class="''' + previous + '''" onContextMenu="return ShowMenu(this, event);">
-			<div id="ctx_menu">
-			<a href="?branch=''' + escape(branch_name) + '''&variant=''' + escape(variant) + '''&force_status=OK"/>Force OK</a>
-			</div>
-			<a class="''' + status + '''"''' + href + '''>''' + status.upper() + '''</a>
-			</td>'''
-		except KeyError:
-			# The variant doesn't exists for this branch
-			print '''<td/>'''
+	# Add all results in their respective columns
+	for os in os_list:
+		for stage in stage_list:
+			variant = stage+":"+os
+			try:
+				status   = branch_status.variants[variant].status
+				previous = branch_status.variants[variant].previous
+				if not previous:
+					previous = status
+				url      = branch_status.variants[variant].url
+				if url:
+					href = ''' href="''' + url + '''"'''
+				else:
+					href = ""
+				print '''  <td class="''' + previous + '''" onContextMenu="return ShowMenu(this, event);">
+    <div id="ctx_menu">
+      <a href="?branch=''' + escape(branch_name) + '''&variant=''' + escape(variant) + '''&force_status=OK"/>Force OK</a>
+    </div>
+    <a class="''' + status + '"' + href + '''> </a>
+  </td>'''
+			except KeyError:
+				# The variant doesn't exists for this branch
+				print '  <td class="null" />'
 
-	print '''</tr>'''
+	print '</tr>'
 	cpt += 1
 	if cpt >= MAX_BRANCH_PER_PAGE:
 		# Stop when whe reach the maximum number of branch to display
