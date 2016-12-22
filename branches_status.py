@@ -88,6 +88,13 @@ table .created {
   border-radius: 6px;
 }
 
+table .skipped { 
+  background: #000000;
+  text-align: center;
+  padding: 4px 4px;
+  border-radius: 6px;
+}
+
 table .running { 
   background: #444444;
   text-align: center;
@@ -156,13 +163,16 @@ class BranchStatus:
 		previous = None
 		if self.variants.has_key(variant):
 			old_build_id = self.variants[variant].build_id
-			old_status   = self.variants[variant].status   # 'pending' 'created' 'skipped' 'running' 'success' 'failed' 'canceled' 'OK'
+			old_status   = self.variants[variant].status   # 'pending' 'created' 'skipped' 'running' 'canceled' 'success' 'failed' 'OK'
 			old_previous = self.variants[variant].previous # 'success' 'failed' 'OK'
-			# Update "previous" build status during a new build ("pending", "created", "running" or "canceled") if it was relevant ("success", "failed" or "OK")
-			if (status == "pending" or status == "created" or status == "running" or status == "canceled") and (old_status == "success" or old_status == "failed" or old_status == "OK"):
-				previous = self.variants[variant].status
-			else: # Else, by default keep "previous" build status if any
-				previous = old_previous
+			# During a new build ("pending", "created", "skipped", "running" or "canceled"),
+			if (status == "pending" or status == "created" or status == "skipped" or status == "running" or status == "canceled"):
+				# if the old build status was a definitive result ("success", "failed" or "OK"), keep it as the "previous" result to display as background
+				if (old_status == "success" or old_status == "failed" or old_status == "OK"):
+					previous = self.variants[variant].status
+				else: # Else, by default simply maintain any "previous" build status
+					previous = old_previous
+			# else, if it is a definitive status ("success", "failed" or "OK") remove the old status
 		# Only keep information on the most recent build for the variant
 		if build_id >= old_build_id:
 			self.variants[variant] = VariantStatus.create(status, previous, url, build_id)
