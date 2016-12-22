@@ -6,13 +6,15 @@ import urlparse
 from datetime import datetime
 import os
 import sys
+import fcntl
 import json
 import PyJSONSerialization
 import traceback
 
-SCRIPT_VERSION      = "v1.3"
-BRANCHES_STATUS     = "branches_status.json" # JSON status of branches
-MAX_BRANCH_PER_PAGE = 11
+SCRIPT_VERSION       = "v1.3"
+BRANCHES_STATUS_JSON = "branches_status.json" # JSON status of branches
+BRANCHES_STATUS_LOCK = "branches_status.lock" # LOCK for the JSON file
+MAX_BRANCH_PER_PAGE  = 11
 
 CSS = '''
 html { 
@@ -176,99 +178,126 @@ class BranchStatus:
 		self.set_result(variant, status, url, build_id)
 
 
+# Cross process locking for the Json file
+# http://blog.vmfarms.com/2011/03/cross-process-locking-and.html
+class Lock:
+	def __init__(self, filename):
+		self.filename = filename
+		self.handle = open(filename, 'w')
+	
+	# Bitwise OR fcntl.LOCK_NB if you need a non-blocking lock 
+	def acquire(self):
+		fcntl.flock(self.handle, fcntl.LOCK_EX)
+	
+	def release(self):
+		fcntl.flock(self.handle, fcntl.LOCK_UN)
+	
+	def __del__(self):
+		self.handle.close()
+
+
 #########################################################################################################################
 #
 #          Main
 
-
-save_to_file = False
-
-# Load previous CI results from file
 try:
-	with open(BRANCHES_STATUS, "r") as f:
-		branch_list = PyJSONSerialization.load(f.read(), globals())
-except:
-	branch_list = dict()
+	lock = Lock(BRANCHES_STATUS_LOCK)
+	lock.acquire()
 
-# Read parameters passed by the command line (CGI)
-try:
-	get_params = urlparse.parse_qs(os.environ['QUERY_STRING'])
-	force_branch  = get_params['branch'][0]
-	force_variant = get_params['variant'][0]
-	force_status  = get_params['force_status'][0]
-	if force_branch and force_variant and force_status:
-		branch_list[force_branch].force_result(force_variant, force_status)
-		save_to_file = True
-except:
-	pass
+	####################################
+	# Load previous CI results from file
+	try:
+		with open(BRANCHES_STATUS_JSON, "r") as f:
+			branch_list = PyJSONSerialization.load(f.read(), globals())
+	except:
+		branch_list = dict()
 
-# Read json data (if available) in the body of the request
-try:
-  #json_status = json.load(sys.stdin)
-	raw_data = sys.stdin.read()
+	save_to_file = False
 
-	json_status = json.loads(raw_data)
-
-	if json_status["object_kind"] == "pipeline":
-		pipeline_id = json_status["object_attributes"]["id"]
-		branch      = json_status["object_attributes"]["ref"]
-		status      = json_status["object_attributes"]["status"] # 'pending' 'running' 'success' 'failed' 'canceled'
-		builds      = json_status["builds"]
-		web_url     = json_status["project"]["web_url"]
-
-		# Update CI results only if there is a new result provided by the Gitlab CI Pipeline Webhook
-		if branch not in branch_list:
-			update = True
-			branch_list[branch] = BranchStatus()
-		elif pipeline_id == branch_list[branch].pipeline_id:
-			update = True
-		elif pipeline_id > branch_list[branch].pipeline_id:
-			update = True
-		else:
-			update = False
-
-		if update:
-			url = web_url + "/pipelines/" + str(pipeline_id)  
-			branch_list[branch].set_id(pipeline_id, url)
+	# Read parameters passed by the command line (CGI)
+	try:
+		get_params = urlparse.parse_qs(os.environ['QUERY_STRING'])
+		force_branch  = get_params['branch'][0]
+		force_variant = get_params['variant'][0]
+		force_status  = get_params['force_status'][0]
+		if force_branch and force_variant and force_status:
+			branch_list[force_branch].force_result(force_variant, force_status)
 			save_to_file = True
+	except:
+		pass
 
-			for build in builds:
-				variant   = build["name"]
-				status    = build["status"]
-				build_id  = build["id"]
-				url       = web_url + "/builds/" + str(build_id)  
-				branch_list[branch].set_result(variant, status, url, build_id)
+	# Read json data (if available) in the body of the request
+	try:
+	  #json_status = json.load(sys.stdin)
+		raw_data = sys.stdin.read()
 
-	elif json_status["object_kind"] == "build":
-		branch   = json_status["ref"]
-		variant  = json_status["build_name"]
-		build_id = json_status["build_id"]
-		status   = json_status["build_status"]
-		web_url  = json_status["repository"]["homepage"]
-		url      = web_url + "/builds/" + str(build_id)  
+		json_status = json.loads(raw_data)
 
-		if branch in branch_list:
-			if variant in branch_list[branch].variants:
-				if build_id == branch_list[branch].variants[variant].build_id:
-					if status != branch_list[branch].variants[variant].status:
+		if json_status["object_kind"] == "pipeline":
+			pipeline_id = json_status["object_attributes"]["id"]
+			branch      = json_status["object_attributes"]["ref"]
+			status      = json_status["object_attributes"]["status"] # 'pending' 'running' 'success' 'failed' 'canceled'
+			builds      = json_status["builds"]
+			web_url     = json_status["project"]["web_url"]
+
+			# Update CI results only if there is a new result provided by the Gitlab CI Pipeline Webhook
+			if branch not in branch_list:
+				update = True
+				branch_list[branch] = BranchStatus()
+			elif pipeline_id == branch_list[branch].pipeline_id:
+				update = True
+			elif pipeline_id > branch_list[branch].pipeline_id:
+				update = True
+			else:
+				update = False
+
+			if update:
+				url = web_url + "/pipelines/" + str(pipeline_id)  
+				branch_list[branch].set_id(pipeline_id, url)
+				save_to_file = True
+
+				for build in builds:
+					variant   = build["name"]
+					status    = build["status"]
+					build_id  = build["id"]
+					url       = web_url + "/builds/" + str(build_id)  
+					branch_list[branch].set_result(variant, status, url, build_id)
+
+		elif json_status["object_kind"] == "build":
+			branch   = json_status["ref"]
+			variant  = json_status["build_name"]
+			build_id = json_status["build_id"]
+			status   = json_status["build_status"]
+			web_url  = json_status["repository"]["homepage"]
+			url      = web_url + "/builds/" + str(build_id)  
+
+			if branch in branch_list:
+				if variant in branch_list[branch].variants:
+					if build_id == branch_list[branch].variants[variant].build_id:
+						if status != branch_list[branch].variants[variant].status:
+							branch_list[branch].set_result(variant, status, url, build_id)
+							save_to_file = True
+
+					elif build_id > branch_list[branch].variants[variant].build_id:
 						branch_list[branch].set_result(variant, status, url, build_id)
 						save_to_file = True
-				elif build_id > branch_list[branch].variants[variant].build_id:
-					branch_list[branch].set_result(variant, status, url, build_id)
-					save_to_file = True
 
-except ValueError as exception:
-	# no data, this is not a Gitlab request
-	pass
-except Exception as exception:
-	pass
+	except ValueError as exception:
+		# no data, this is not a Gitlab request
+		pass
+	except Exception as exception:
+		pass
 
 
-if save_to_file:
-	# Save results to file
-	with open(BRANCHES_STATUS, "w") as f:
-		f.write (PyJSONSerialization.dump(branch_list))
+	####################################
+	# Save new results to file
+	if save_to_file:
+		# TODO : limit number of branches to store in the json file (drop oldest ones by timestamp)
+		with open(BRANCHES_STATUS_JSON, "w") as f:
+			f.write (PyJSONSerialization.dump(branch_list))
 
+finally: 
+	lock.release()
 
 # ###############################################################
 # Display CI results
@@ -282,7 +311,7 @@ print '''Content-type: text/html; charset=utf-8'
 <html>
 <head>
   <title>Branch status</title>
-  <meta http-equiv="refresh" content="15">
+  <meta http-equiv="refresh" content="20">
   <style>''' + CSS + '''</style>
 </head>
 <script language="javascript" type="text/javascript">
