@@ -353,7 +353,7 @@ for branch_name, branch_status in branch_list.iteritems():
 print '''<div id="titre">Branch Status</div>'''
 print '''<table>'''
 print '''<tr><th/>'''
-for variant in variant_list:
+for variant in sorted(variant_list):
 	variant_title = variant.split(":", 1)
 	print '''<th class="titre">''' + variant_title[0] + "<br/>" + variant_title[-1] + '''</td>''' # extract "quick" and "linux" from "quick:linux"
 print '''</tr>'''
@@ -367,7 +367,7 @@ for (branch_name, branch_status) in sorted(branch_list.items(), key=lambda(k,v):
 		print '''<tr><td class="branch">''' + branch_name + '''</a></td>'''
 
 	# Add a column for each variant
-	for variant in variant_list:
+	for variant in sorted(variant_list):
 		try:
 			status   = branch_status.variants[variant].status
 			previous = branch_status.variants[variant].previous
