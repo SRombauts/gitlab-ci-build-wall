@@ -11,7 +11,7 @@ import json
 import PyJSONSerialization
 import traceback
 
-SCRIPT_VERSION       = "v1.3"
+SCRIPT_VERSION       = "v1.3.2"
 BRANCHES_STATUS_JSON = "branches_status.json" # JSON status of branches
 BRANCHES_STATUS_LOCK = "branches_status.lock" # LOCK for the JSON file
 MAX_BRANCH_PER_PAGE  = 11
@@ -56,7 +56,7 @@ table tr th, table tr td {
 }
 
 table tr th {
-  font-size: 1.6em;
+  font-size: 1.5em;
 }
 
 table tr td {
@@ -65,7 +65,7 @@ table tr td {
 }
 
 table .branch {
-  font-size: 3em;
+  font-size: 2.5em;
   text-align: left;
 }
 
