@@ -11,13 +11,13 @@ import json
 import PyJSONSerialization
 import traceback
 
-SCRIPT_VERSION       = "v1.3.2"
+SCRIPT_VERSION       = "v1.4.0"
 BRANCHES_STATUS_JSON = "branches_status.json" # JSON status of branches
 BRANCHES_STATUS_LOCK = "branches_status.lock" # LOCK for the JSON file
 MAX_BRANCH_PER_PAGE  = 11
 
 CSS = '''
-html { 
+html {
   height: 100%;
 }
 
@@ -61,53 +61,55 @@ table tr th {
 
 table tr td {
   background: #444444;
-  font-size: 1.4em;
+  font-size: 1.3em;
+  font-weight: bold;
 }
 
 table .branch {
   font-size: 2.5em;
   text-align: left;
+  font-weight: normal;
 }
 
-table .pipeline { 
+table .pipeline {
   background: #444444;
   text-align: center;
 }
 
-table .pending { 
+table .pending {
   background: #000000;
   text-align: center;
   padding: 4px 4px;
   border-radius: 6px;
 }
 
-table .created { 
+table .created {
   background: #000000;
   text-align: center;
   padding: 4px 4px;
   border-radius: 6px;
 }
 
-table .skipped { 
+table .skipped {
   background: #000000;
   text-align: center;
   padding: 4px 4px;
   border-radius: 6px;
 }
 
-table .running { 
-  background: #444444;
+table .running {
+  background: #7799BB;
   text-align: center;
-  padding: 4px 4px;
+  padding: 8px 4px;
   border-radius: 6px;
 }
 
-table .success { 
+table .success {
   background: #00BB00;
   text-align: center;
 }
 
-table .OK { 
+table .OK {
   background: #00BB00;
   text-align: center;
 }
@@ -128,7 +130,7 @@ sys.stderr = sys.stdout
 def escape(txt):
 	return cgi.escape(txt, True)
 
-# Variant of a branch  - Allow to monitor different jobs 
+# Variant of a branch  - Allow to monitor different jobs
 # 1 variant = 1 column shown on the display
 class VariantStatus:
 	def __init__(self):
@@ -194,14 +196,14 @@ class Lock:
 	def __init__(self, filename):
 		self.filename = filename
 		self.handle = open(filename, 'w')
-	
-	# Bitwise OR fcntl.LOCK_NB if you need a non-blocking lock 
+
+	# Bitwise OR fcntl.LOCK_NB if you need a non-blocking lock
 	def acquire(self):
 		fcntl.flock(self.handle, fcntl.LOCK_EX)
-	
+
 	def release(self):
 		fcntl.flock(self.handle, fcntl.LOCK_UN)
-	
+
 	def __del__(self):
 		self.handle.close()
 
@@ -262,7 +264,7 @@ try:
 				update = False
 
 			if update:
-				url = web_url + "/pipelines/" + str(pipeline_id)  
+				url = web_url + "/pipelines/" + str(pipeline_id)
 				branch_list[branch].set_id(pipeline_id, url)
 				save_to_file = True
 
@@ -270,7 +272,7 @@ try:
 					variant   = build["name"]
 					status    = build["status"]
 					build_id  = build["id"]
-					url       = web_url + "/builds/" + str(build_id)  
+					url       = web_url + "/builds/" + str(build_id)
 					branch_list[branch].set_result(variant, status, url, build_id)
 
 		elif json_status["object_kind"] == "build":
@@ -279,7 +281,7 @@ try:
 			build_id = json_status["build_id"]
 			status   = json_status["build_status"]
 			web_url  = json_status["repository"]["homepage"]
-			url      = web_url + "/builds/" + str(build_id)  
+			url      = web_url + "/builds/" + str(build_id)
 
 			if branch in branch_list:
 				if variant in branch_list[branch].variants:
@@ -306,7 +308,7 @@ try:
 		with open(BRANCHES_STATUS_JSON, "w") as f:
 			f.write (PyJSONSerialization.dump(branch_list))
 
-finally: 
+finally:
 	lock.release()
 
 # ###############################################################
@@ -336,7 +338,7 @@ console.log(self.id)
   menu.style.left = posx;
   menu.style.top = posy;
   self.onmouseleave = function(){menu.style.visibility = 'hidden';};
-  
+
   return false;
 }
 </script>
@@ -378,6 +380,7 @@ for (branch_name, branch_status) in sorted(branch_list.items(), key=lambda(k,v):
 				href = ''' href="''' + url + '''"'''
 			else:
 				href = ""
+			# TODO NOCOMMIT
 			print '''<td class="''' + previous + '''" onContextMenu="return ShowMenu(this, event);">
 			<div id="ctx_menu">
 			<a href="?branch=''' + escape(branch_name) + '''&variant=''' + escape(variant) + '''&force_status=OK"/>Force OK</a>
@@ -393,7 +396,7 @@ for (branch_name, branch_status) in sorted(branch_list.items(), key=lambda(k,v):
 	if cpt >= MAX_BRANCH_PER_PAGE:
 		# Stop when whe reach the maximum number of branch to display
 		break
-	
+
 print '''</table>
 '''+SCRIPT_VERSION+'''
 </html>'''
