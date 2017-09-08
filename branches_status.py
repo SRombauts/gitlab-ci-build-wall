@@ -11,10 +11,10 @@ import json
 import PyJSONSerialization
 import traceback
 
-SCRIPT_VERSION       = "v1.4.1"
+SCRIPT_VERSION       = "v1.5"
 BRANCHES_STATUS_JSON = "branches_status.json" # JSON status of branches
 BRANCHES_STATUS_LOCK = "branches_status.lock" # LOCK for the JSON file
-MAX_BRANCH_PER_PAGE  = 14
+MAX_BRANCH_PER_PAGE  = 15
 
 CSS = '''
 html {
@@ -30,7 +30,7 @@ html {
 }
 
 #titre {
-  font-size: 3em;
+  font-size: 2em;
   font-family: "Arial", Arial, sans-serif;
   text-align: center;
 }
@@ -56,17 +56,17 @@ table tr th, table tr td {
 }
 
 table tr th {
-  font-size: 1.4em;
+  font-size: 1.2em;
 }
 
 table tr td {
   background: #444444;
-  font-size: 1.25em;
+  font-size: 1.05em;
   font-weight: bold;
 }
 
 table .branch {
-  font-size: 2.1em;
+  font-size: 1.8em;
   text-align: left;
   font-weight: normal;
 }
@@ -346,10 +346,12 @@ console.log(self.id)
 
 # Iterate through branch list to extract the list of variants
 variant_list = []
-for branch_name, branch_status in branch_list.iteritems():
+for count, (branch_name, branch_status) in enumerate(sorted(branch_list.items(), key=lambda(k,v): v.date_maj, reverse=True), 1):
 	for variant_name, variants in branch_status.variants.iteritems():
 		if variant_name not in variant_list :
 			variant_list.append(variant_name)
+	if count == MAX_BRANCH_PER_PAGE:
+		break
 
 # Header of the table
 print '''<div id="titre">Branch Status</div>'''
@@ -361,8 +363,7 @@ for variant in sorted(variant_list):
 print '''</tr>'''
 
 # Iterate through branches sorted by date of the last update
-cpt = 0
-for (branch_name, branch_status) in sorted(branch_list.items(), key=lambda(k,v): v.date_maj, reverse=True):
+for count, (branch_name, branch_status) in enumerate(sorted(branch_list.items(), key=lambda(k,v): v.date_maj, reverse=True), 1):
 	if branch_status.url:
 		print '''<tr><td class="branch"><a class="pipeline" href="'''+branch_status.url+'''">''' + branch_name + '''</a></td>'''
 	else:
@@ -392,9 +393,9 @@ for (branch_name, branch_status) in sorted(branch_list.items(), key=lambda(k,v):
 			print '''<td/>'''
 
 	print '''</tr>'''
-	cpt += 1
-	if cpt >= MAX_BRANCH_PER_PAGE:
-		# Stop when whe reach the maximum number of branch to display
+
+	# Stop when whe reach the maximum number of branch to display
+	if count == MAX_BRANCH_PER_PAGE:
 		break
 
 print '''</table>
