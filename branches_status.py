@@ -359,7 +359,12 @@ print '''<table>'''
 print '''<tr><th/>'''
 for variant in sorted(variant_list):
 	variant_title = variant.split(":", 1)
-	print '''<th class="titre">''' + variant_title[0] + "<br/>" + variant_title[-1] + '''</td>''' # extract "quick" and "linux" from "quick:linux"
+	variant_title_1 = variant_title[0]
+	if len(variant_title) >= 2:
+		variant_title_2 = variant_title[1]
+	else:
+		variant_title_2 = ""
+	print '''<th class="titre">''' + variant_title_1 + "<br/>" + variant_title_2 + '''</td>''' # extract "quick" and "linux" from "quick:linux"
 print '''</tr>'''
 
 # Iterate through branches sorted by date of the last update
