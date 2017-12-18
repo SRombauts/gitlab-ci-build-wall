@@ -11,10 +11,11 @@ import json
 import PyJSONSerialization
 import traceback
 
-SCRIPT_VERSION       = "v1.5"
+SCRIPT_VERSION       = "v1.6"
 BRANCHES_STATUS_JSON = "branches_status.json" # JSON status of branches
 BRANCHES_STATUS_LOCK = "branches_status.lock" # LOCK for the JSON file
 MAX_BRANCH_PER_PAGE  = 15
+MAX_BRANCH_TO_STORE  = 30
 
 CSS = '''
 html {
@@ -304,7 +305,10 @@ try:
 	####################################
 	# Save new results to file
 	if save_to_file:
-		# TODO : limit number of branches to store in the json file (drop oldest ones by timestamp)
+		# Limit number of branches to store in the json file (drop oldest ones by timestamp)
+		for count, (branch_name, branch_status) in enumerate(sorted(branch_list.items(), key=lambda(k,v): v.date_maj, reverse=True), 1):
+			if count >= MAX_BRANCH_TO_STORE:
+				del branch_list[branch_name]
 		with open(BRANCHES_STATUS_JSON, "w") as f:
 			f.write (PyJSONSerialization.dump(branch_list))
 
